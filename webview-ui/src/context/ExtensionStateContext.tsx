@@ -8,6 +8,7 @@ import { McpServer } from "../../../src/shared/mcp"
 import { convertTextMateToHljs } from "../utils/textMateToHljs"
 import { vscode } from "../utils/vscode"
 import { DEFAULT_BROWSER_SETTINGS } from "../../../src/shared/BrowserSettings"
+import { QdrantConfiguration, DEFAULT_QDRANT_SETTINGS } from "../../../src/shared/QdrantConfiguration"
 
 interface ExtensionStateContextType extends ExtensionState {
 	didHydrateState: boolean
@@ -16,6 +17,7 @@ interface ExtensionStateContextType extends ExtensionState {
 	openRouterModels: Record<string, ModelInfo>
 	mcpServers: McpServer[]
 	filePaths: string[]
+	setQdrantConfiguration: (config: QdrantConfiguration) => void
 	setApiConfiguration: (config: ApiConfiguration) => void
 	setCustomInstructions: (value?: string) => void
 	setShowAnnouncement: (value: boolean) => void
@@ -33,6 +35,7 @@ export const ExtensionStateContextProvider: React.FC<{
 		shouldShowAnnouncement: false,
 		autoApprovalSettings: DEFAULT_AUTO_APPROVAL_SETTINGS,
 		browserSettings: DEFAULT_BROWSER_SETTINGS,
+		qdrantConfiguration: DEFAULT_QDRANT_SETTINGS,
 	})
 	const [didHydrateState, setDidHydrateState] = useState(false)
 	const [showWelcome, setShowWelcome] = useState(false)
@@ -51,18 +54,18 @@ export const ExtensionStateContextProvider: React.FC<{
 				const config = message.state?.apiConfiguration
 				const hasKey = config
 					? [
-							config.apiKey,
-							config.openRouterApiKey,
-							config.awsRegion,
-							config.vertexProjectId,
-							config.openAiApiKey,
-							config.ollamaModelId,
-							config.lmStudioModelId,
-							config.geminiApiKey,
-							config.openAiNativeApiKey,
-							config.deepSeekApiKey,
-							config.mistralApiKey,
-						].some((key) => key !== undefined)
+						config.apiKey,
+						config.openRouterApiKey,
+						config.awsRegion,
+						config.vertexProjectId,
+						config.openAiApiKey,
+						config.ollamaModelId,
+						config.lmStudioModelId,
+						config.geminiApiKey,
+						config.openAiNativeApiKey,
+						config.deepSeekApiKey,
+						config.mistralApiKey,
+					].some((key) => key !== undefined)
 					: false
 				setShowWelcome(!hasKey)
 				setDidHydrateState(true)
@@ -81,7 +84,6 @@ export const ExtensionStateContextProvider: React.FC<{
 			case "partialMessage": {
 				const partialMessage = message.partialMessage!
 				setState((prevState) => {
-					// worth noting it will never be possible for a more up-to-date message to be sent here or in normal messages post since the presentAssistantContent function uses lock
 					const lastIndex = findLastIndex(prevState.clineMessages, (msg) => msg.ts === partialMessage.ts)
 					if (lastIndex !== -1) {
 						const newClineMessages = [...prevState.clineMessages]
@@ -95,13 +97,22 @@ export const ExtensionStateContextProvider: React.FC<{
 			case "openRouterModels": {
 				const updatedModels = message.openRouterModels ?? {}
 				setOpenRouterModels({
-					[openRouterDefaultModelId]: openRouterDefaultModelInfo, // in case the extension sent a model list without the default model
+					[openRouterDefaultModelId]: openRouterDefaultModelInfo,
 					...updatedModels,
 				})
 				break
 			}
 			case "mcpServers": {
 				setMcpServers(message.mcpServers ?? [])
+				break
+			}
+			case "qdrantConfiguration": {
+				if (message.qdrantConfiguration) {
+					setState((prevState) => ({
+						...prevState,
+						qdrantConfiguration: message.qdrantConfiguration ?? DEFAULT_QDRANT_SETTINGS,
+					}))
+				}
 				break
 			}
 		}
@@ -121,6 +132,11 @@ export const ExtensionStateContextProvider: React.FC<{
 		openRouterModels,
 		mcpServers,
 		filePaths,
+		setQdrantConfiguration: (value) =>
+			setState((prevState) => ({
+				...prevState,
+				qdrantConfiguration: value,
+			})),
 		setApiConfiguration: (value) =>
 			setState((prevState) => ({
 				...prevState,

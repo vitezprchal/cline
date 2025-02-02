@@ -6,6 +6,7 @@ import { ClineProvider } from "./core/webview/ClineProvider"
 import { createClineAPI } from "./exports"
 import "./utils/path" // necessary to have access to String.prototype.toPosix
 import { DIFF_VIEW_URI_SCHEME } from "./integrations/editor/DiffViewProvider"
+import { generateEmbeddings } from "./integrations/misc/db-embeddings"
 
 /*
 Built using https://github.com/microsoft/vscode-webview-ui-toolkit
@@ -145,6 +146,22 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	}
 	context.subscriptions.push(vscode.window.registerUriHandler({ handleUri }))
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand("cline.generateEmbeddings", async (configStr: string) => {
+			try {
+				const visibleProvider = ClineProvider.getVisibleInstance()
+				if (!visibleProvider) {
+					return
+				}
+				const qdrantClient = await generateEmbeddings(configStr)
+				visibleProvider.qdrantClient = qdrantClient
+			} catch (error) {
+				outputChannel.appendLine(`Error generating embeddings: ${error}`)
+				vscode.window.showErrorMessage(`Failed to generate embeddings: ${error}`)
+			}
+		})
+	)
 
 	return createClineAPI(outputChannel, sidebarProvider)
 }

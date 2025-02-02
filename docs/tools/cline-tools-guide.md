@@ -65,7 +65,7 @@ Cline has access to the following tools for various tasks:
     - `replace_in_file`: Make targeted edits to files
     - `search_files`: Search files using regex
     - `list_files`: List directory contents
-
+    - `search_code`: Search code using semantic search
 2. **Terminal Operations**
 
     - `execute_command`: Run CLI commands

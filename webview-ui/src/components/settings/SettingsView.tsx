@@ -4,6 +4,7 @@ import { useExtensionState } from "../../context/ExtensionStateContext"
 import { validateApiConfiguration, validateModelId } from "../../utils/validate"
 import { vscode } from "../../utils/vscode"
 import ApiOptions from "./ApiOptions"
+import VectorDbOptions from './VectorDbOptions'
 
 const IS_DEV = false // FIXME: use flags when packaging
 
@@ -90,6 +91,10 @@ const SettingsView = ({ onDone }: SettingsViewProps) => {
 						apiErrorMessage={apiErrorMessage}
 						modelIdErrorMessage={modelIdErrorMessage}
 					/>
+				</div>
+
+				<div style={{ marginBottom: 5 }}>
+					<VectorDbOptions />
 				</div>
 
 				<div style={{ marginBottom: 5 }}>

@@ -57,6 +57,7 @@ import { OpenAiHandler } from "../api/providers/openai"
 import CheckpointTracker from "../integrations/checkpoints/CheckpointTracker"
 import getFolderSize from "get-folder-size"
 import { BrowserSettings } from "../shared/BrowserSettings"
+import { generateEmbedding } from '../integrations/misc/db-embeddings'
 
 const cwd = vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath).at(0) ?? path.join(os.homedir(), "Desktop") // may or may not exist but fs checking existence would immediately ask for permission which would be bad UX, need to come up with a better solution
 
@@ -1378,6 +1379,8 @@ export class Cline {
 							return `[${block.name} for '${block.params.regex}'${
 								block.params.file_pattern ? ` in '${block.params.file_pattern}'` : ""
 							}]`
+						case "search_code":
+							return `[${block.name} for '${block.params.query}']`
 						case "list_files":
 							return `[${block.name} for '${block.params.path}']`
 						case "list_code_definition_names":
@@ -1945,6 +1948,105 @@ export class Cline {
 							}
 						} catch (error) {
 							await handleError("parsing source code definitions", error)
+							await this.saveCheckpoint()
+							break
+						}
+					}
+					case "search_code": {
+						const query: string | undefined = block.params.query
+						const sharedMessageProps: ClineSayTool = {
+							tool: "searchCode",
+							query: removeClosingTag("query", query),
+						}
+						
+						try {
+							if (block.partial) {
+								const partialMessage = JSON.stringify({
+									...sharedMessageProps,
+									content: "",
+								} satisfies ClineSayTool)
+								
+								if (this.shouldAutoApproveTool(block.name)) {
+									this.removeLastPartialMessageIfExistsWithType("ask", "tool")
+									await this.say("tool", partialMessage, undefined, block.partial)
+								} else {
+									this.removeLastPartialMessageIfExistsWithType("say", "tool")
+									await this.ask("tool", partialMessage, block.partial).catch(() => {})
+								}
+								break
+							} else {
+								if (!query) {
+									this.consecutiveMistakeCount++
+									pushToolResult(await this.sayAndCreateMissingParamError("search_code", "query"))
+									await this.saveCheckpoint()
+									break
+								}
+								
+								const prov = this.providerRef.deref()
+								const qdrantClient = prov?.qdrantClient
+								
+								if (!qdrantClient) {
+									pushToolResult(formatResponse.toolError("Qdrant client is not available"))
+									await this.saveCheckpoint()
+									break
+								}
+								
+								this.consecutiveMistakeCount = 0
+								const completeMessage = JSON.stringify({
+									...sharedMessageProps,
+									content: query,
+								} satisfies ClineSayTool)
+
+								if (this.shouldAutoApproveTool(block.name)) {
+									this.removeLastPartialMessageIfExistsWithType("ask", "tool")
+									await this.say("tool", completeMessage, undefined, false)
+									this.consecutiveAutoApprovedRequestsCount++
+								} else {
+									showNotificationForApprovalIfAutoApprovalEnabled(
+										`Cline wants to search code for: ${query}`
+									)
+									this.removeLastPartialMessageIfExistsWithType("say", "tool")
+									const didApprove = await askApproval("tool", completeMessage)
+									if (!didApprove) {
+										await this.saveCheckpoint()
+										break
+									}
+								}
+
+								const queryEmb = await generateEmbedding(query, qdrantClient.embeddingInstance)
+
+								const results = await qdrantClient.instance.search(qdrantClient.collectionName, {
+									vector: queryEmb,
+									limit: 5, // TODO: setting
+									with_payload: true,
+									with_vector: false
+								})
+
+								console.log(results)
+
+								if (!results || results.length === 0) {
+									pushToolResult("No code matches found for the given query.")
+								} else {
+									const formattedResults = results.map((result, index) => {
+										const payload = result.payload
+										const score = result.score
+										const content = payload?.text
+										const path = payload?.filePath
+										return `Match ${index + 1} (Score: ${(score * 100).toFixed(2)}%):\n` +
+											   `File: ${path}\n` +
+											   `\`\`\`\n${content}\n\`\`\`\n`
+									}).join('\n')
+
+									pushToolResult(
+										`Found ${results.length} code matches:\n\n${formattedResults}`
+									)
+								}
+								
+								await this.saveCheckpoint()
+								break
+							}
+						} catch (error) {
+							await handleError("searching code", error)
 							await this.saveCheckpoint()
 							break
 						}

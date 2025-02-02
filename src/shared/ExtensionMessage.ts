@@ -5,22 +5,24 @@ import { AutoApprovalSettings } from "./AutoApprovalSettings"
 import { BrowserSettings } from "./BrowserSettings"
 import { HistoryItem } from "./HistoryItem"
 import { McpServer } from "./mcp"
+import { QdrantConfiguration } from './QdrantConfiguration'
 
 // webview will hold state
 export interface ExtensionMessage {
 	type:
-		| "action"
-		| "state"
-		| "selectedImages"
-		| "ollamaModels"
-		| "lmStudioModels"
-		| "theme"
-		| "workspaceUpdated"
-		| "invoke"
-		| "partialMessage"
-		| "openRouterModels"
-		| "mcpServers"
-		| "relinquishControl"
+	| "action"
+	| "state"
+	| "selectedImages"
+	| "ollamaModels"
+	| "lmStudioModels"
+	| "theme"
+	| "workspaceUpdated"
+	| "invoke"
+	| "partialMessage"
+	| "openRouterModels"
+	| "mcpServers"
+	| "relinquishControl"
+	| "qdrantConfiguration"
 	text?: string
 	action?: "chatButtonClicked" | "mcpButtonClicked" | "settingsButtonClicked" | "historyButtonClicked" | "didBecomeVisible"
 	invoke?: "sendMessage" | "primaryButtonClick" | "secondaryButtonClick"
@@ -32,6 +34,7 @@ export interface ExtensionMessage {
 	partialMessage?: ClineMessage
 	openRouterModels?: Record<string, ModelInfo>
 	mcpServers?: McpServer[]
+	qdrantConfiguration?: QdrantConfiguration
 }
 
 export interface ExtensionState {
@@ -46,6 +49,7 @@ export interface ExtensionState {
 	shouldShowAnnouncement: boolean
 	autoApprovalSettings: AutoApprovalSettings
 	browserSettings: BrowserSettings
+	qdrantConfiguration?: QdrantConfiguration
 }
 
 export interface ClineMessage {
@@ -107,11 +111,13 @@ export interface ClineSayTool {
 		| "listFilesRecursive"
 		| "listCodeDefinitionNames"
 		| "searchFiles"
+		| "searchCode"
 	path?: string
 	diff?: string
 	content?: string
 	regex?: string
 	filePattern?: string
+	query?: string
 }
 
 // must keep in sync with system prompt
